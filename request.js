@@ -18,8 +18,36 @@
     {id:11,group:'digital',name:'تصميم وتطوير المواقع والتطبيقات',desc:'تصميم وبرمجة المواقع والتطبيقات.'}
   ];
   const groupNames = {texts:'النصوص والمخطوطات',books:'الكتب والنشر',academic:'الخدمات الأكاديمية',digital:'التصميم والحلول الرقمية'};
-  const state = {step:1,selected:[],details:{},format:'لا يوجد تفضيل محدد',timing:'بحسب الاتفاق',name:'',phone:'',notes:''};
+  const state = {step:1,selected:[],suggested:[],initialDescription:'',details:{},format:'لا يوجد تفضيل محدد',timing:'بحسب الاتفاق',name:'',phone:'',notes:''};
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const serviceKeywords = {
+    1:['مخطوط','مخطوطة','مخطوطات','خط اليد','مكتوب بخط اليد','رقمنة مخطوط','نسخ مخطوط'],
+    2:['تفريغ صوت','تسجيل صوت','ملف صوت','محاضرة مسجلة','درس مسجل','مقابلة مسجلة','تسجيل'],
+    3:['تنسيق مستند','تنسيق ملف','ملف وورد','مستند','تقرير','نماذج','وورد'],
+    4:['تنسيق كتاب','تنسيق الكتب','اخراج كتاب','إخراج كتاب','صفحات كتاب','تجهيز كتاب','كتاب للطباعة'],
+    5:['تطوير كتاب','إعادة إخراج','اعادة اخراج','تجديد كتاب','تحسين إخراج كتاب','تحديث كتاب'],
+    6:['غلاف كتاب','أغلفة الكتب','تصميم غلاف','غلاف رواية','غلاف'],
+    7:['بحث جامعي','بحث علمي','تنسيق بحث','رسالة جامعية','رسالة ماجستير','أطروحة','اطروحة','مجلة علمية'],
+    8:['مراجعة لغوية','تدقيق لغوي','مراجعة علمية','توثيق','مراجع البحث','APA','تدقيق','مراجعة بحث'],
+    9:['عرض تقديمي','ملخص','خريطة ذهنية','انفوجرافيك','إنفوجرافيك','مادة تعليمية','وسيلة تعليمية'],
+    10:['هوية بصرية','شعار','منشور','اعلان','إعلان','تصميم جرافيكي','تصميم جرافيك','مطبوعات'],
+    11:['موقع إلكتروني','موقع الكتروني','موقع ويب','تطبيق','برمجة موقع','متجر إلكتروني','متجر الكتروني','نظام إلكتروني']
+  };
+  function normalizeText(value) {
+    return String(value || '').toLowerCase()
+      .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g,'')
+      .replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي')
+      .replace(/\\s+/g,' ').trim();
+  }
+  function suggestServices(description) {
+    const text = normalizeText(description);
+    if (!text) return [];
+    return Object.entries(serviceKeywords).map(([id,words]) => ({
+      id:Number(id),
+      score:words.reduce((sum,word) => sum + (text.includes(normalizeText(word)) ? Math.max(2,normalizeText(word).length/3) : 0),0)
+    })).filter(item=>item.score>0).sort((a,b)=>b.score-a.score).slice(0,4).map(item=>item.id);
+  }
+
   const queryService = Number(new URLSearchParams(location.search).get('service'));
   if (services.some(item => item.id === queryService)) state.selected = [queryService];
 
@@ -42,12 +70,18 @@
       <label class="service-option ${state.selected.includes(item.id)?'is-selected':''}" data-service-option="${item.id}">
         <input type="checkbox" value="${item.id}" ${state.selected.includes(item.id)?'checked':''}>
         <span class="option-check" aria-hidden="true">${state.selected.includes(item.id)?'✓':''}</span>
-        <span class="option-copy"><strong>${item.name}</strong><small>${item.desc}</small></span>
+        <span class="option-copy"><strong>${item.name}</strong><small>${groupNames[item.group]} · ${item.desc}</small></span>
       </label>`).join('');
     return shell(`
       <h2>ما الخدمات التي تحتاج إليها؟</h2>
-      <p class="wizard-intro">اختر خدمة واحدة أو أكثر. يمكنك البحث باسم الخدمة أو تصفح القائمة.</p>
-      <input class="service-search" id="serviceSearch" type="search" placeholder="ابحث عن خدمة..." autocomplete="off" aria-label="البحث في الخدمات">
+      <p class="wizard-intro">يمكنك وصف احتياجك أولاً للحصول على اقتراحات، أو اختيار الخدمات مباشرة من القائمة.</p>
+      <div class="need-assistant">
+        <label for="needDescription">صف العمل الذي تحتاج إلى إنجازه</label>
+        <textarea id="needDescription" placeholder="مثال: أحتاج تنسيق بحث جامعي ومراجعة المراجع، أو تحويل مخطوط إلى ملف Word..."></textarea>
+        <div class="need-assistant-actions"><button type="button" class="button button-muted" data-action="suggest">اقتراح الخدمات المناسبة</button><small>الاقتراحات مبنية على كلمات مفتاحية؛ ويمكنك تعديل الاختيار يدوياً.</small></div>
+        <div id="suggestionResult" class="suggestion-result" aria-live="polite"></div>
+      </div>
+      <input class="service-search" id="serviceSearch" type="search" placeholder="أو ابحث باسم خدمة..." autocomplete="off" aria-label="البحث في الخدمات">
       <div class="service-options" id="serviceOptions">${cards}</div>
       <p class="wizard-intro" id="selectionCount" aria-live="polite">لم يتم اختيار خدمات بعد.</p>
       ${actions('السابق','متابعة إلى تفاصيل المشروع')}`);
@@ -114,7 +148,9 @@
   }
 
   function makeWhatsappUrl() {
-    const lines = ['طلب خدمة جديد – منصة بصمة كتاب','',`اسم العميل: ${state.name}`,`رقم التواصل: ${state.phone}`,'','الخدمات المطلوبة:'];
+    const lines = ['طلب خدمة جديد – منصة بصمة كتاب','',`اسم العميل: ${state.name}`,`رقم التواصل: ${state.phone}`];
+    if (state.initialDescription) lines.push(`وصف العميل الأولي: ${state.initialDescription}`);
+    lines.push('','الخدمات المطلوبة:');
     state.selected.forEach((id,index) => {
       lines.push(`${index+1}. ${services.find(s=>s.id===id).name}`);
       lines.push(state.details[id] || '');
@@ -129,6 +165,8 @@
   function render() {
     root.innerHTML = state.step===1 ? stepOne() : state.step===2 ? stepTwo() : state.step===3 ? stepThree() : review();
     if (state.step===1) {
+      const description = root.querySelector('#needDescription');
+      if (description) description.value = state.initialDescription;
       const count = root.querySelector('#selectionCount');
       count.textContent = state.selected.length ? `الخدمات المحددة: ${state.selected.length}` : 'لم يتم اختيار خدمات بعد.';
       const search = root.querySelector('#serviceSearch');
@@ -163,6 +201,36 @@
     const button = event.target.closest('[data-action]');
     if (!button) return;
     const action = button.dataset.action;
+    if (action==='suggest') {
+      state.initialDescription = root.querySelector('#needDescription').value.trim();
+      state.suggested = suggestServices(state.initialDescription);
+      const box = root.querySelector('#suggestionResult');
+      box.replaceChildren();
+      if (!state.suggested.length) {
+        const empty = document.createElement('p');
+        empty.className = 'suggestion-empty';
+        empty.textContent = 'لم نتمكن من تحديد خدمة تلقائياً من الوصف الحالي. استخدم البحث أو اختر الخدمة المناسبة من القائمة.';
+        box.appendChild(empty);
+      } else {
+        const heading = document.createElement('div');
+        heading.className = 'suggestion-heading';
+        heading.textContent = 'الخدمات الأقرب إلى وصفك';
+        const names = document.createElement('p');
+        names.textContent = state.suggested.map(id => services.find(service=>service.id===id).name).join('، ');
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'button button-primary';
+        add.dataset.action = 'apply-suggestions';
+        add.textContent = 'إضافة الاقتراحات إلى اختياراتي';
+        box.append(heading,names,add);
+      }
+      return;
+    }
+    if (action==='apply-suggestions') {
+      state.suggested.forEach(id => { if (!state.selected.includes(id)) state.selected.push(id); });
+      render();
+      return;
+    }
     if (action==='back') {
       if (state.step===4) state.step=3;
       else if (state.step>1) state.step--;
