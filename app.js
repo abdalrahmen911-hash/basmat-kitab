@@ -30,8 +30,8 @@
         const red = data[offset];
         const green = data[offset + 1];
         const blue = data[offset + 2];
-        return red > 218 && green > 218 && blue > 218 &&
-          Math.max(red, green, blue) - Math.min(red, green, blue) < 34;
+        return red > 205 && green > 205 && blue > 205 &&
+          Math.max(red, green, blue) - Math.min(red, green, blue) < 38;
       };
       const add = index => {
         if (index < 0 || index >= total || visited[index] || !isPaper(index)) return;
@@ -57,7 +57,7 @@
       for (let n = 0; n < tail; n++) {
         const offset = queue[n] * 4;
         const luminance = 0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2];
-        data[offset + 3] = Math.max(0, Math.min(255, Math.round((255 - luminance) * 8)));
+        data[offset + 3] = Math.max(0, Math.min(255, Math.round((255 - luminance) * 5)));
       }
       context.putImageData(image, 0, 0);
       const transparentPng = canvas.toDataURL('image/png');
