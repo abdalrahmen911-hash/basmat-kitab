@@ -1,4 +1,4 @@
-const CACHE_NAME = 'basmat-kitab-v2';
+const CACHE_NAME = 'basmat-kitab-v3';
 const APP_SHELL = [
   './','./index.html','./services.html','./request.html','./contact.html',
   './styles.css','./app.js','./request.js','./manifest.webmanifest',
